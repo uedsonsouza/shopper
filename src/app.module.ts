@@ -1,14 +1,10 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { ComponentsController } from './components/components.controller';
-import { WaterGasConsumptionModule } from './water-gas-consumption/water-gas-consumption.module';
 import { MedidorModule } from './medidor/medidor.module';
-import { WaterGasConsumptionModule } from './water-gas-consumption/water-gas-consumption.module';
-
+import { MedidorController } from './medidor/medidor.controller';
+import { MedidorService } from './medidor/medidor.service';
 @Module({
-  imports: [WaterGasConsumptionModule, MedidorModule],
-  controllers: [AppController, ComponentsController],
-  providers: [AppService],
+  imports: [MedidorModule],
+  controllers: [MedidorController],
+  providers: [MedidorService],
 })
 export class AppModule {}
