@@ -1,13 +1,15 @@
 import {
   Controller,
   Post,
+  Patch,
   Body,
   ConflictException,
   BadRequestException,
-  Patch,
+  NotFoundException,
 } from '@nestjs/common';
 import { MedidorService } from './medidor.service';
 import { CreateMedidorDto } from './dto/create-medidor.dto';
+import { ConfirmMedidorDto } from './dto/confirm-medidor.dto';
 
 @Controller('medidor')
 export class MedidorController {
@@ -16,10 +18,25 @@ export class MedidorController {
   @Post('upload')
   async uploadMedidor(@Body() createMedidorDto: CreateMedidorDto) {
     try {
-      await this.medidorService.uploadMedidor(createMedidorDto);
+      return await this.medidorService.uploadMedidor(createMedidorDto);
     } catch (error) {
-      if (error.code === '23505') {
-        throw new ConflictException('Customer code already exists');
+      if (error instanceof ConflictException) {
+        throw new ConflictException(error.message);
+      } else {
+        throw new BadRequestException(error.message);
+      }
+    }
+  }
+
+  @Patch('confirm')
+  async confirmMedidor(@Body() confirmMedidorDto: ConfirmMedidorDto) {
+    try {
+      return await this.medidorService.confirmMedidor(confirmMedidorDto);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new NotFoundException(error.message);
+      } else if (error instanceof ConflictException) {
+        throw new ConflictException(error.message);
       } else {
         throw new BadRequestException(error.message);
       }

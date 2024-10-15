@@ -2,11 +2,13 @@ import {
   Injectable,
   ConflictException,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
 import { Medidor } from '../../typeorm/entities/medidor.entity';
 import { CreateMedidorDto } from './dto/create-medidor.dto';
+import { ConfirmMedidorDto } from './dto/confirm-medidor.dto';
 import axios from 'axios';
 
 @Injectable()
@@ -70,6 +72,31 @@ export class MedidorService {
       medidor_uuid: medidor.id,
     };
   }
+  async confirmMedidor(
+    confirmMedidorDto: ConfirmMedidorDto,
+  ): Promise<{ success: boolean }> {
+    const { measure_uuid, confirmed_value } = confirmMedidorDto;
+
+    const medidor = await this.medidorRepository.findOne({
+      where: { id: measure_uuid },
+    });
+
+    if (!medidor) {
+      throw new NotFoundException('Leitura não encontrada');
+    }
+
+    if (medidor.has_confirmed) {
+      throw new ConflictException('Leitura já confirmada');
+    }
+
+    medidor.measure_value = confirmed_value;
+    medidor.has_confirmed = true;
+
+    await this.medidorRepository.save(medidor);
+
+    return { success: true };
+  }
+
   //funcao pra fazer a requisicao para o gemini
   async extactMedidaFromImage(image_url: string) {
     try {
