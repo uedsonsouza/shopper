@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
-import { Medidor } from './entities/medidor.entity';
+import { Medidor } from '../../typeorm/entities/medidor.entity';
 import { CreateMedidorDto } from './dto/create-medidor.dto';
 import axios from 'axios';
 
@@ -13,7 +13,7 @@ import axios from 'axios';
 export class MedidorService {
   constructor(
     @InjectRepository(Medidor)
-    private medidorRepository: Repository<Medidor>,
+    public medidorRepository: Repository<Medidor>,
   ) {}
 
   async uploadMedidor(

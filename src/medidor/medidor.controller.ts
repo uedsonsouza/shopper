@@ -4,6 +4,7 @@ import {
   Body,
   ConflictException,
   BadRequestException,
+  Patch,
 } from '@nestjs/common';
 import { MedidorService } from './medidor.service';
 import { CreateMedidorDto } from './dto/create-medidor.dto';
