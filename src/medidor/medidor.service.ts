@@ -133,7 +133,7 @@ export class MedidorService {
   async extactMedidaFromImage(image_url: string) {
     try {
       const response = await axios.post(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyBpCr5pVT1KJM5qXCi8LO-jLICm6KSTxsY',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={AIzaSyBpCr5pVT1KJM5qXCi8LO-jLICm6KSTxsY}',
         {
           image_url,
         },

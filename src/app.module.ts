@@ -4,7 +4,9 @@ import { MedidorService } from './medidor/medidor.service';
 import { Medidor } from '../typeorm/entities/medidor.entity';
 import { MedidorController } from './medidor/medidor.controller';
 import { MedidorModule } from './medidor/medidor.module';
+import * as dotenv from 'dotenv';
 
+dotenv.config();
 @Module({
   imports: [
     TypeOrmModule.forRoot({
