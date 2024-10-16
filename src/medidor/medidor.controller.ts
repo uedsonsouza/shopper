@@ -6,6 +6,9 @@ import {
   ConflictException,
   BadRequestException,
   NotFoundException,
+  Query,
+  Param,
+  Get,
 } from '@nestjs/common';
 import { MedidorService } from './medidor.service';
 import { CreateMedidorDto } from './dto/create-medidor.dto';
@@ -37,6 +40,24 @@ export class MedidorController {
         throw new NotFoundException(error.message);
       } else if (error instanceof ConflictException) {
         throw new ConflictException(error.message);
+      } else {
+        throw new BadRequestException(error.message);
+      }
+    }
+  }
+
+  @Get(':customer_code')
+  async listMedidores(
+    @Param('customer_code') customerCode: string,
+    @Query('measure_type') measureType: string,
+  ) {
+    try {
+      return await this.medidorService.listMedidores(customerCode, measureType);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw new BadRequestException(error.message);
+      } else if (error instanceof NotFoundException) {
+        throw new NotFoundException(error.message);
       } else {
         throw new BadRequestException(error.message);
       }

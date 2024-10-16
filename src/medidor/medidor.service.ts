@@ -96,12 +96,44 @@ export class MedidorService {
 
     return { success: true };
   }
+  async listMedidores(
+    customerCode: string,
+    measureType?: string,
+  ): Promise<{ customer_code: string; measures: any[] }> {
+    const whereCondition: any = { customer_code: customerCode };
 
+    if (measureType) {
+      const typeUpper = measureType.toUpperCase();
+      if (typeUpper !== 'WATER' && typeUpper !== 'GAS') {
+        throw new BadRequestException('Tipo de medição não permitida');
+      }
+      whereCondition.measure_type = typeUpper;
+    }
+
+    const medidores = await this.medidorRepository.find({
+      where: whereCondition,
+    });
+
+    if (medidores.length === 0) {
+      throw new NotFoundException('Nenhuma leitura encontrada');
+    }
+
+    return {
+      customer_code: customerCode,
+      measures: medidores.map((medidor) => ({
+        measure_uuid: medidor.id,
+        measure_datetime: medidor.measure_dateTime,
+        measure_type: medidor.measure_type,
+        has_confirmed: medidor.has_confirmed,
+        image_url: medidor.image_url,
+      })),
+    };
+  }
   //funcao pra fazer a requisicao para o gemini
   async extactMedidaFromImage(image_url: string) {
     try {
       const response = await axios.post(
-        'https://ai.google.dev/gemini-api/vision',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyBpCr5pVT1KJM5qXCi8LO-jLICm6KSTxsY',
         {
           image_url,
         },
