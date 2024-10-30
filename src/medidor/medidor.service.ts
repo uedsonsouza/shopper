@@ -1,3 +1,4 @@
+import axios from 'axios';
 import {
   Injectable,
   ConflictException,
@@ -9,7 +10,8 @@ import { Between, Repository } from 'typeorm';
 import { Medidor } from '../../typeorm/entities/medidor.entity';
 import { CreateMedidorDto } from './dto/create-medidor.dto';
 import { ConfirmMedidorDto } from './dto/confirm-medidor.dto';
-import axios from 'axios';
+// import * as fs from 'fs';
+// import * as path from 'path';
 
 @Injectable()
 export class MedidorService {
@@ -21,7 +23,8 @@ export class MedidorService {
   async uploadMedidor(
     createMedidorDto: CreateMedidorDto,
   ): Promise<{ image_url: any; measure_value: any; medidor_uuid: string }> {
-    const { customer_code, measure_type, measure_dateTime } = createMedidorDto;
+    const { customer_code, measure_type, measure_dateTime, image_url } =
+      createMedidorDto;
 
     // Verifica a existência de uma leitura no mês
     const existingMedidor = await this.medidorRepository.findOne({
@@ -47,10 +50,10 @@ export class MedidorService {
       throw new ConflictException('Medidor já existe');
     }
 
-    // Processa a imagem e extrai a medida usando a API Ollama
-    const responseOllama = await this.extactMedidaFromImage(
-      createMedidorDto.image_url,
-    );
+    // converte a imagem pra base 64
+    const imageBase64 = await this.convertImageUrlToBase64(image_url);
+
+    const responseOllama = await this.extactMedidaFromImage(imageBase64);
     if (!responseOllama) {
       throw new BadRequestException('Imagem não reconhecida');
     }
@@ -70,6 +73,41 @@ export class MedidorService {
       measure_value: responseOllama.measure_value,
       medidor_uuid: medidor.id,
     };
+  }
+
+  async convertImageUrlToBase64(url: string): Promise<string> {
+    try {
+      const response = await axios.get(url, { responseType: 'arraybuffer' });
+      const imageBase64 = Buffer.from(response.data, 'binary').toString(
+        'base64',
+      );
+      return imageBase64;
+    } catch (error) {
+      console.error('Erro ao converter a imagem para Base64:', error);
+      throw new BadRequestException('Falha ao processar a imagem fornecida');
+    }
+  }
+
+  async extactMedidaFromImage(imageBase64: string) {
+    try {
+      const response = await axios.post('http://localhost:11434/api/generate', {
+        model: 'llava',
+        prompt: 'O que está nesta imagem?',
+        stream: false,
+        images: [imageBase64],
+      });
+
+      if (response.status === 200) {
+        const { response: content, done } = response.data;
+        if (!done || !content) {
+          throw new Error('A medida não foi extraída corretamente');
+        }
+        return { measure_value: content, image_url: imageBase64 };
+      }
+    } catch (error) {
+      console.error('Erro ao extrair medida da imagem:', error);
+      throw new BadRequestException('Erro ao processar a imagem na API Ollama');
+    }
   }
 
   async confirmMedidor(
@@ -96,6 +134,7 @@ export class MedidorService {
 
     return { success: true };
   }
+
   async listMedidores(
     customerCode: string,
     measureType?: string,
@@ -129,6 +168,7 @@ export class MedidorService {
       })),
     };
   }
+
   async listAllMedidores(): Promise<{ measures: any[] }> {
     const medidores = await this.medidorRepository.find();
 
@@ -146,27 +186,5 @@ export class MedidorService {
         image_url: medidor.image_url,
       })),
     };
-  }
-  //funcao pra fazer a requisicao para o gemini
-  async extactMedidaFromImage(imageBase64: string) {
-    try {
-      const response = await axios.post('http://localhost:11434/api/generate', {
-        model: 'llava',
-        prompt: 'O que está nesta imagem?',
-        stream: false,
-        images: [imageBase64],
-      });
-
-      if (response.status === 200) {
-        const { response: content, done } = response.data;
-        if (!done || !content) {
-          throw new Error('A medida não foi extraída corretamente');
-        }
-        return { measure_value: content, image_url: imageBase64 };
-      }
-    } catch (error) {
-      console.error('Erro ao extrair medida da imagem:', error);
-      throw new BadRequestException('Erro ao processar a imagem na API Ollama');
-    }
   }
 }
