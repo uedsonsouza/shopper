@@ -63,4 +63,13 @@ export class MedidorController {
       }
     }
   }
+
+  @Get('/')
+  async listAllMedidores() {
+    try {
+      return await this.medidorService.listAllMedidores();
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
 }

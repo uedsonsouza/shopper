@@ -23,7 +23,7 @@ export class MedidorService {
   ): Promise<{ image_url: any; measure_value: any; medidor_uuid: string }> {
     const { customer_code, measure_type, measure_dateTime } = createMedidorDto;
 
-    // verifica a existencia de uma leitura no mes
+    // Verifica a existência de uma leitura no mês
     const existingMedidor = await this.medidorRepository.findOne({
       where: {
         customer_code,
@@ -44,34 +44,34 @@ export class MedidorService {
     });
 
     if (existingMedidor) {
-      throw new ConflictException('Medidor already exists');
+      throw new ConflictException('Medidor já existe');
     }
 
-    // faz a consulta e busca a imagem
-
-    const geminiResponse = await this.extactMedidaFromImage(
+    // Processa a imagem e extrai a medida usando a API Ollama
+    const responseOllama = await this.extactMedidaFromImage(
       createMedidorDto.image_url,
     );
-    if (!geminiResponse) {
-      throw new BadRequestException('Image not recognized');
+    if (!responseOllama) {
+      throw new BadRequestException('Imagem não reconhecida');
     }
 
     const medidor = this.medidorRepository.create({
       customer_code,
       measure_type,
       measure_dateTime: new Date(measure_dateTime),
-      measure_value: geminiResponse.measure_value,
-      image_url: geminiResponse.image_url,
+      measure_value: responseOllama.measure_value,
+      image_url: responseOllama.image_url,
     });
 
     await this.medidorRepository.save(medidor);
 
     return {
-      image_url: geminiResponse.image_url,
-      measure_value: geminiResponse.measure_value,
+      image_url: responseOllama.image_url,
+      measure_value: responseOllama.measure_value,
       medidor_uuid: medidor.id,
     };
   }
+
   async confirmMedidor(
     confirmMedidorDto: ConfirmMedidorDto,
   ): Promise<{ success: boolean }> {
@@ -129,27 +129,44 @@ export class MedidorService {
       })),
     };
   }
+  async listAllMedidores(): Promise<{ measures: any[] }> {
+    const medidores = await this.medidorRepository.find();
+
+    if (medidores.length === 0) {
+      throw new NotFoundException('Nenhuma leitura encontrada');
+    }
+
+    return {
+      measures: medidores.map((medidor) => ({
+        measure_uuid: medidor.id,
+        customer_code: medidor.customer_code,
+        measure_datetime: medidor.measure_dateTime,
+        measure_type: medidor.measure_type,
+        has_confirmed: medidor.has_confirmed,
+        image_url: medidor.image_url,
+      })),
+    };
+  }
   //funcao pra fazer a requisicao para o gemini
-  async extactMedidaFromImage(image_url: string) {
+  async extactMedidaFromImage(imageBase64: string) {
     try {
-      const response = await axios.post(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={AIzaSyBpCr5pVT1KJM5qXCi8LO-jLICm6KSTxsY}',
-        {
-          image_url,
-        },
-        {
-          headers: {
-            Autorization: `Bearer ${process.env.GEMINI_API_KEY}`,
-          },
-        },
-      );
+      const response = await axios.post('http://localhost:11434/api/generate', {
+        model: 'llava',
+        prompt: 'O que está nesta imagem?',
+        stream: false,
+        images: [imageBase64],
+      });
 
       if (response.status === 200) {
-        const { measure_value, image_url } = response.data;
-        return { measure_value, image_url };
+        const { response: content, done } = response.data;
+        if (!done || !content) {
+          throw new Error('A medida não foi extraída corretamente');
+        }
+        return { measure_value: content, image_url: imageBase64 };
       }
-    } catch {
-      return null;
+    } catch (error) {
+      console.error('Erro ao extrair medida da imagem:', error);
+      throw new BadRequestException('Erro ao processar a imagem na API Ollama');
     }
   }
 }
