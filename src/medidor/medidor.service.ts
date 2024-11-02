@@ -54,6 +54,7 @@ export class MedidorService {
     const imageBase64 = await this.convertImageUrlToBase64(image_url);
 
     const responseOllama = await this.extactMedidaFromImage(imageBase64);
+    console.log('responseOllama ===> ', responseOllama);
     if (!responseOllama) {
       throw new BadRequestException('Imagem não reconhecida');
     }
@@ -78,6 +79,8 @@ export class MedidorService {
   async convertImageUrlToBase64(url: string): Promise<string> {
     try {
       const response = await axios.get(url, { responseType: 'arraybuffer' });
+
+      console.log('API Ollama Response Status ===> ', response.status);
       const imageBase64 = Buffer.from(response.data, 'binary').toString(
         'base64',
       );
@@ -96,7 +99,7 @@ export class MedidorService {
         stream: false,
         images: [imageBase64],
       });
-
+  
       if (response.status === 200) {
         const { response: content, done } = response.data;
         if (!done || !content) {
@@ -104,11 +107,15 @@ export class MedidorService {
         }
         return { measure_value: content, image_url: imageBase64 };
       }
-    } catch (error) {
-      console.error('Erro ao extrair medida da imagem:', error);
+    } catch (error: any) {
+      if (error.code === 'ECONNREFUSED') {
+        console.error('Servidor Ollama não está acessível na porta 11434');
+      } else {
+        console.error('Erro ao extrair medida da imagem:', error);
+      }
       throw new BadRequestException('Erro ao processar a imagem na API Ollama');
     }
-  }
+  }  
 
   async confirmMedidor(
     confirmMedidorDto: ConfirmMedidorDto,

@@ -8,7 +8,13 @@ describe('MedidorController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [MedidorController],
-      providers: [MedidorService],
+      providers: [
+        MedidorService,
+        {
+          provide: 'MedidorRepository',
+          useValue: {}, // Mock the repository or provide a proper implementation
+        },
+      ],
     }).compile();
 
     controller = module.get<MedidorController>(MedidorController);
