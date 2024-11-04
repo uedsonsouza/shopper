@@ -24,6 +24,7 @@
     "migration:revert": "yarn typeorm:ts migration:revert -- -d ./typeorm/data-source.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
     "@nestjs/common": "^10.0.0",
     "@nestjs/core": "^10.0.0",
     "@nestjs/mapped-types": "*",

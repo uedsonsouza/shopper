@@ -10,19 +10,27 @@ import { Between, Repository } from 'typeorm';
 import { Medidor } from '../../typeorm/entities/medidor.entity';
 import { CreateMedidorDto } from './dto/create-medidor.dto';
 import { ConfirmMedidorDto } from './dto/confirm-medidor.dto';
-// import * as fs from 'fs';
-// import * as path from 'path';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
 
 @Injectable()
 export class MedidorService {
+  private genAI: GoogleGenerativeAI;
+
   constructor(
     @InjectRepository(Medidor)
     public medidorRepository: Repository<Medidor>,
-  ) {}
+  ) {
+    this.genAI = new GoogleGenerativeAI(process.env.API_KEY);
+  }
 
-  async uploadMedidor(
-    createMedidorDto: CreateMedidorDto,
-  ): Promise<{ image_url: any; measure_value: any; medidor_uuid: string }> {
+  async uploadMedidor(createMedidorDto: CreateMedidorDto): Promise<{
+    image_url: string;
+    measure_value: string;
+    medidor_uuid: string;
+  }> {
     const { customer_code, measure_type, measure_dateTime, image_url } =
       createMedidorDto;
 
@@ -50,28 +58,29 @@ export class MedidorService {
       throw new ConflictException('Medidor já existe');
     }
 
-    // converte a imagem pra base 64
+    // Converte a imagem para base64
     const imageBase64 = await this.convertImageUrlToBase64(image_url);
 
-    const responseOllama = await this.extactMedidaFromImage(imageBase64);
-    console.log('responseOllama ===> ', responseOllama);
-    if (!responseOllama) {
+    // Extrai o valor da medida da imagem usando a API Gemini
+    const responseGemini = await this.extractMeasureFromImage(imageBase64);
+    if (!responseGemini) {
       throw new BadRequestException('Imagem não reconhecida');
     }
 
+    // Cria uma nova entrada de medidor no banco de dados
     const medidor = this.medidorRepository.create({
       customer_code,
       measure_type,
       measure_dateTime: new Date(measure_dateTime),
-      measure_value: responseOllama.measure_value,
-      image_url: responseOllama.image_url,
+      measure_value: parseFloat(responseGemini.measure_value),
+      image_url: responseGemini.image_url,
     });
 
     await this.medidorRepository.save(medidor);
 
     return {
-      image_url: responseOllama.image_url,
-      measure_value: responseOllama.measure_value,
+      image_url: responseGemini.image_url,
+      measure_value: responseGemini.measure_value,
       medidor_uuid: medidor.id,
     };
   }
@@ -79,8 +88,6 @@ export class MedidorService {
   async convertImageUrlToBase64(url: string): Promise<string> {
     try {
       const response = await axios.get(url, { responseType: 'arraybuffer' });
-
-      console.log('API Ollama Response Status ===> ', response.status);
       const imageBase64 = Buffer.from(response.data, 'binary').toString(
         'base64',
       );
@@ -91,31 +98,31 @@ export class MedidorService {
     }
   }
 
-  async extactMedidaFromImage(imageBase64: string) {
+  async extractMeasureFromImage(
+    imageBase64: string,
+  ): Promise<{ measure_value: string; image_url: string }> {
     try {
-      const response = await axios.post('http://localhost:11434/api/generate', {
-        model: 'llava',
-        prompt: 'O que está nesta imagem?',
-        stream: false,
-        images: [imageBase64],
+      const model = this.genAI.getGenerativeModel({
+        model: 'gemini-1.5-flash',
       });
-  
-      if (response.status === 200) {
-        const { response: content, done } = response.data;
-        if (!done || !content) {
-          throw new Error('A medida não foi extraída corretamente');
-        }
-        return { measure_value: content, image_url: imageBase64 };
-      }
-    } catch (error: any) {
-      if (error.code === 'ECONNREFUSED') {
-        console.error('Servidor Ollama não está acessível na porta 11434');
-      } else {
-        console.error('Erro ao extrair medida da imagem:', error);
-      }
-      throw new BadRequestException('Erro ao processar a imagem na API Ollama');
+
+      const prompt = 'O que está nesta imagem?';
+      const imagePart = {
+        inlineData: {
+          data: imageBase64,
+          mimeType: 'image/jpeg', // ou "image/png" dependendo do tipo de imagem
+        },
+      };
+
+      const result = await model.generateContent([prompt, imagePart]);
+      const responseText = await result.response.text();
+
+      return { measure_value: responseText, image_url: imageBase64 };
+    } catch (error) {
+      console.error('Erro ao extrair medida da imagem:', error);
+      throw new BadRequestException('Erro ao processar a imagem na API Gemini');
     }
-  }  
+  }
 
   async confirmMedidor(
     confirmMedidorDto: ConfirmMedidorDto,
